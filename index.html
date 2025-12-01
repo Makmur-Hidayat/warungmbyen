@@ -1,464 +1,64 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-  <base target="_top">
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
-  
-  <style>
-    body {
-      display: flex;
-      min-height: 100vh;
-      flex-direction: column;
-      background-color: #f4f4f4;
-    }
-    main {
-      flex: 1 0 auto;
-      padding-top: 20px;
-    }
-    .card-login {
-      margin-top: 10%;
-    }
-    /* Mobile optimization */
-    @media only screen and (max-width: 600px) {
-      .card-login {
-        margin-top: 20px;
-      }
-      .container {
-        width: 95% !important;
-      }
-    }
-    /* Loading screen */
-    #loading-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.8);
-      z-index: 1000;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    .data-table-container {
-      overflow-x: auto;
-      margin-top: 20px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Informasi PSSI ASKAB Kabupaten Kepulauan Mentawai (SIPAKEM)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    
+    <style>
+        :root { --primary-color: #007bff; }
+        body { background-color: #f8f9fa; }
+        .sidebar {
+            height: 100vh; width: 250px; position: fixed; top: 0; left: 0;
+            background-color: #343a40; padding-top: 56px; color: white; transition: all 0.3s;
+        }
+        .sidebar .nav-link { color: #ccc; padding: 10px 15px; }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active { color: white; background-color: #007bff; }
+        .content { margin-left: 250px; padding: 20px; transition: all 0.3s; }
+        .navbar-brand { font-weight: bold; }
+        #loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.8); z-index: 1050; display: none;
+            justify-content: center; align-items: center;
+        }
+        .form-label { font-weight: 500; }
+        #login-page {
+            height: 100vh; display: flex; justify-content: center; align-items: center;
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        }
+        #login-form {
+            background: white; padding: 40px; border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); width: 100%; max-width: 400px;
+        }
+        .navbar-user-info { color: white; margin-right: 15px; }
+    </style>
 </head>
 <body>
 
-  <div id="app-container">
-    
     <div id="loading-overlay">
-      <div class="preloader-wrapper big active">
-        <div class="spinner-layer spinner-blue-only">
-          <div class="circle-clipper left">
-            <div class="circle"></div>
-          </div><div class="gap-patch">
-            <div class="circle"></div>
-          </div><div class="circle-clipper right">
-            <div class="circle"></div>
-          </div>
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-primary">Memuat...</p>
         </div>
-      </div>
-    </div>
-    
     </div>
 
-  <div id="tim-modal" class="modal">
-    <div class="modal-content">
-      <h4><span id="modal-title">Tambah</span> Anggota Tim</h4>
-      <form id="tim-form-entry">
-        <input type="hidden" name="idtime" id="tim-idtime"> 
-        <div id="tim-form-fields" class="row">
-          </div>
-        <div class="modal-footer">
-          <button class="btn waves-effect waves-light teal" type="submit">
-            <i class="material-icons left">save</i> Simpan
-          </button>
-          <a href="#!" class="modal-close waves-effect waves-green btn-flat">Batal</a>
+    <div id="app-container">
         </div>
-      </form>
+
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="liveToast" class="toast align-items-center text-white border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body" id="toast-body"></div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
     </div>
-  </div>
-
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
-
-  <script>
-    const APP_CONTAINER = document.getElementById('app-container');
-    const LOADING_OVERLAY = document.getElementById('loading-overlay');
-    const TOKEN_KEY = 'askab_session_token';
-    let timHeadersMap = {}; // Untuk menyimpan mapping kolom listtim
-
-    document.addEventListener('DOMContentLoaded', initApp);
-
-    function showLoading(show) {
-      LOADING_OVERLAY.style.display = show ? 'flex' : 'none';
-    }
-
-    // --- Inisialisasi Aplikasi dan Cek Sesi ---
-    function initApp() {
-      const token = localStorage.getItem(TOKEN_KEY);
-      showLoading(true);
-      
-      // Cek token sesi di server
-      google.script.run
-        .withSuccessHandler(response => {
-          showLoading(false);
-          if (response.status === 'loggedIn') {
-            renderDashboard(response.username);
-          } else {
-            renderLoginPage();
-          }
-        })
-        .checkSession(token);
-    }
     
-    // --- Render Halaman Login ---
-    function renderLoginPage() {
-      APP_CONTAINER.innerHTML = `
-        <div class="container" style="max-width: 400px;">
-          <div class="card card-login">
-            <div class="card-content">
-              <span class="card-title center-align teal-text">Login Askab PSSI</span>
-              <form id="login-form">
-                <div class="input-field">
-                  <input id="username" type="text" name="username" required>
-                  <label for="username">Username</label>
-                </div>
-                <div class="input-field">
-                  <input id="password" type="password" name="password" required>
-                  <label for="password">Password</label>
-                </div>
-                <button class="btn waves-effect waves-light teal lighten-1 col s12" type="submit">Login</button>
-              </form>
-            </div>
-          </div>
-        </div>
-      `;
-      attachLoginListener();
-    }
-
-    function attachLoginListener() {
-      const form = document.getElementById('login-form');
-      form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const formData = {
-          username: form.username.value,
-          password: form.password.value
-        };
-
-        showLoading(true);
-        google.script.run
-          .withSuccessHandler(response => {
-            showLoading(false);
-            if (response.success) {
-              localStorage.setItem(TOKEN_KEY, response.token); 
-              M.toast({html: `Selamat datang, ${response.username}!`, classes: 'green'});
-              renderDashboard(response.username);
-            } else {
-              M.toast({html: response.message, classes: 'red'});
-            }
-          })
-          .processLogin(formData);
-      });
-    }
-    
-    // --- Logout Kustom ---
-    window.logout = function() {
-      const token = localStorage.getItem(TOKEN_KEY);
-      showLoading(true);
-      google.script.run
-        .withSuccessHandler(response => {
-          localStorage.removeItem(TOKEN_KEY);
-          showLoading(false);
-          M.toast({html: 'Logout berhasil', classes: 'green'});
-          renderLoginPage();
-        })
-        .serverLogout(token);
-    }
-    
-    // --- Render Dashboard ---
-    function renderDashboard(username) {
-        APP_CONTAINER.innerHTML = `
-          <header>
-            <nav class="teal lighten-1">
-              <div class="nav-wrapper container">
-                <a href="#" class="brand-logo">ASKAB</a>
-                <ul id="nav-mobile" class="right hide-on-med-and-down">
-                  <li>Selamat datang, <span id="username-display">${username}</span></li>
-                  <li><a href="#!" onclick="logout()">Logout</a></li>
-                </ul>
-                <a href="#" data-target="mobile-demo" class="sidenav-trigger"><i class="material-icons">menu</i></a>
-              </div>
-            </nav>
-            <div class="container">
-              <ul class="tabs tabs-fixed-width tab-demo z-depth-1">
-                <li class="tab col s6"><a class="active" href="#klub-section">Data Klub</a></li>
-                <li class="tab col s6"><a href="#tim-section">Data Tim</a></li>
-              </ul>
-            </div>
-          </header>
-
-          <main class="container">
-            <div id="klub-section" class="col s12">
-              <h5>Data Klub Anda</h5>
-              <div class="card">
-                <div class="card-content">
-                  <form id="klub-form">
-                    </form>
-                  <div class="card-action">
-                    <button class="btn waves-effect waves-light teal" type="submit" form="klub-form">
-                      <i class="material-icons left">save</i> Simpan
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div id="tim-section" class="col s12">
-              <h5>Manajemen Anggota Tim</h5>
-              <a class="waves-effect waves-light btn modal-trigger teal" href="#tim-modal" id="add-tim-btn">
-                  <i class="material-icons left">add</i> Tambah Tim
-              </a>
-              <div class="data-table-container">
-                <table class="striped responsive-table" id="tim-table">
-                  <thead></thead>
-                  <tbody></tbody>
-                </table>
-              </div>
-            </div>
-          </main>
-        `;
-        initDashboard();
-    }
-    
-    function initDashboard() {
-      M.Tabs.init(document.querySelector('.tabs'));
-      M.Modal.init(document.querySelectorAll('.modal'));
-      
-      loadKlubForm();
-      loadTimTable();
-
-      document.getElementById('klub-form').addEventListener('submit', handleSaveKlub);
-      document.getElementById('tim-form-entry').addEventListener('submit', handleSaveTim);
-      
-      document.getElementById('add-tim-btn').addEventListener('click', () => {
-          resetTimForm();
-          document.getElementById('modal-title').textContent = 'Tambah';
-          M.Modal.getInstance(document.getElementById('tim-modal')).open();
-      });
-    }
-
-    // --- Klub Fungsionalitas ---
-    function loadKlubForm() {
-      showLoading(true);
-      const token = localStorage.getItem(TOKEN_KEY);
-      google.script.run
-        .withSuccessHandler(response => {
-          showLoading(false);
-          if (response.error) { M.toast({html: response.error, classes: 'red'}); return; }
-          
-          const form = document.getElementById('klub-form');
-          form.innerHTML = '';
-          
-          // Data keys dari response.data
-          const fields = Object.keys(response.data);
-          const klubHeaders = response.headers;
-          
-          fields.forEach(key => {
-            // Lewati input username dan idklub (diisi otomatis)
-            if (key === 'username' || key === 'idklub') return; 
-
-            // Cari nama header asli untuk label
-            const headerIndex = klubHeaders.map(h => h.toLowerCase().replace(/\s/g, '')).indexOf(key);
-            const labelText = headerIndex !== -1 ? klubHeaders[headerIndex] : key;
-
-            const inputHtml = `
-              <div class="input-field col s12 m6">
-                <input id="klub-${key}" name="${key}" type="text" value="${response.data[key] || ''}" ${response.hasKlub ? '' : 'required'}>
-                <label for="klub-${key}" class="${response.data[key] ? 'active' : ''}">${labelText}</label>
-              </div>
-            `;
-            form.insertAdjacentHTML('beforeend', inputHtml);
-          });
-          
-          M.updateTextFields(); 
-        })
-        .getKlubData(token);
-    }
-
-    function handleSaveKlub(e) {
-        e.preventDefault();
-        showLoading(true);
-        const token = localStorage.getItem(TOKEN_KEY);
-        const formData = {};
-        const form = e.target;
-        
-        new FormData(form).forEach((value, key) => formData[key] = value);
-
-        google.script.run
-          .withSuccessHandler(response => {
-            showLoading(false);
-            M.toast({html: response.message, classes: response.success ? 'green' : 'red'});
-            if (response.success) loadKlubForm();
-          })
-          .saveKlubData(formData, token);
-    }
-
-    // --- Tim Fungsionalitas ---
-    function loadTimTable() {
-      showLoading(true);
-      const token = localStorage.getItem(TOKEN_KEY);
-      google.script.run
-        .withSuccessHandler(response => {
-          showLoading(false);
-          if (response.error) { M.toast({html: response.error, classes: 'red'}); return; }
-          
-          // Simpan map header untuk form modal
-          timHeadersMap = {};
-          response.headers.forEach(h => {
-              timHeadersMap[h.toLowerCase().replace(/\s/g, '')] = h;
-          });
-          
-          renderTimTable(response.data, response.headers);
-          renderTimModalFields(response.headers);
-        })
-        .getTimData(token);
-    }
-    
-    function renderTimModalFields(headers) {
-        const modalBody = document.getElementById('tim-form-fields');
-        modalBody.innerHTML = '';
-        
-        headers.forEach(header => {
-            const key = header.toLowerCase().replace(/\s/g, '');
-            // Lewati kolom yang diisi otomatis (idklub) atau yang khusus (idtime)
-            if (key === 'idklub' || key === 'idtime') return; 
-            
-            const inputHtml = `
-              <div class="input-field col s12 m6">
-                <input id="tim-${key}" name="${key}" type="text">
-                <label for="tim-${key}">${header}</label>
-              </div>
-            `;
-            modalBody.insertAdjacentHTML('beforeend', inputHtml);
-        });
-    }
-
-    function renderTimTable(data, headers) {
-      const tableHead = document.querySelector('#tim-table thead');
-      const tableBody = document.querySelector('#tim-table tbody');
-      tableHead.innerHTML = '';
-      tableBody.innerHTML = '';
-      
-      const displayHeaders = headers.filter(h => {
-          const key = h.toLowerCase().replace(/\s/g, '');
-          return key !== 'idklub' && key !== 'idtime';
-      });
-
-      // Buat Header Tabel
-      let headHtml = '<tr>';
-      displayHeaders.forEach(h => headHtml += `<th>${h}</th>`);
-      headHtml += '<th>Aksi</th></tr>';
-      tableHead.innerHTML = headHtml;
-
-      // Isi Baris Data
-      data.forEach(item => {
-        let rowHtml = '<tr>';
-        
-        displayHeaders.forEach(h => {
-            const key = h.toLowerCase().replace(/\s/g, '');
-            rowHtml += `<td>${item[key] || '-'}</td>`;
-        });
-        
-        // Tombol Aksi
-        rowHtml += `<td>
-          <a href="#!" class="btn-small orange" onclick="editTim('${item.idtime}')"><i class="material-icons">edit</i></a>
-          <a href="#!" class="btn-small red" onclick="confirmDeleteTim('${item.idtime}')"><i class="material-icons">delete</i></a>
-        </td></tr>`;
-        tableBody.insertAdjacentHTML('beforeend', rowHtml);
-      });
-    }
-    
-    window.editTim = function(idTim) {
-        resetTimForm();
-        const token = localStorage.getItem(TOKEN_KEY);
-        showLoading(true);
-
-        google.script.run.withSuccessHandler(response => {
-            showLoading(false);
-            const data = response.data.find(item => item.idtime.toString() === idTim.toString());
-            if (data) {
-                document.getElementById('modal-title').textContent = 'Edit';
-                document.getElementById('tim-idtime').value = data.idtime;
-                
-                // Isi form dengan data
-                Object.keys(timHeadersMap).forEach(key => {
-                    const input = document.getElementById(`tim-${key}`); 
-                    if (input) {
-                        input.value = data[key] || '';
-                        input.nextElementSibling.classList.add('active'); // Aktifkan label
-                    }
-                });
-
-                M.Modal.getInstance(document.getElementById('tim-modal')).open();
-                M.updateTextFields();
-            } else {
-                M.toast({html: 'Data tidak ditemukan.', classes: 'red'});
-            }
-        }).getTimData(token);
-    }
-    
-    function resetTimForm() {
-        const form = document.getElementById('tim-form-entry');
-        form.reset();
-        document.getElementById('tim-idtime').value = '';
-        form.querySelectorAll('label').forEach(label => label.classList.remove('active'));
-        M.updateTextFields(); 
-    }
-
-    function handleSaveTim(e) {
-        e.preventDefault();
-        showLoading(true);
-        const token = localStorage.getItem(TOKEN_KEY);
-        const formData = {};
-        const form = e.target;
-        
-        new FormData(form).forEach((value, key) => formData[key] = value);
-
-        google.script.run
-          .withSuccessHandler(response => {
-            showLoading(false);
-            M.toast({html: response.message, classes: response.success ? 'green' : 'red'});
-            if (response.success) {
-              M.Modal.getInstance(document.getElementById('tim-modal')).close();
-              loadTimTable();
-            }
-          })
-          .saveTimEntry(formData, token);
-    }
-    
-    window.confirmDeleteTim = function(idTim) {
-        if (confirm('Yakin ingin menghapus data tim ini?')) {
-            showLoading(true);
-            const token = localStorage.getItem(TOKEN_KEY);
-            google.script.run
-              .withSuccessHandler(response => {
-                showLoading(false);
-                M.toast({html: response.message, classes: response.success ? 'green' : 'red'});
-                if (response.success) {
-                  loadTimTable();
-                }
-              })
-              .deleteTimEntry(idTim, token);
-        }
-    }
-    
-  </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
